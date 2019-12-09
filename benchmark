@@ -3,7 +3,23 @@
 require 'tmpdir'
 
 def fat_jar(baseline_jar, new_jar)
-  benchmark("Fat jar", "java -jar #{baseline_jar}", "java -jar #{new_jar}")
+  benchmark("Fat jar", "java -jar #{baseline_jar} 2>&1", "java -jar #{new_jar} 2>&1")
+end
+
+def exploded_launcher(baseline_jar, new_jar)
+	Dir.mktmpdir do |baseline_dir|
+		Dir.mktmpdir do |new_dir|
+		  benchmark("Exploded Launcher", get_exploded_launcher_command(baseline_jar, baseline_dir), get_exploded_launcher_command(new_jar, new_dir))
+		end
+	end
+end
+
+def exploded_launcher_vs_main_method(jar, jar1)
+	Dir.mktmpdir do |baseline_dir|
+		Dir.mktmpdir do |new_dir|
+		  benchmark("Exploded Launcher Vs Main Method", get_exploded_launcher_command(jar, baseline_dir), get_main_method_command(jar, new_dir))
+		end
+	end
 end
 
 def main_method(baseline_jar, new_jar)
@@ -14,10 +30,16 @@ def main_method(baseline_jar, new_jar)
   end
 end
 
+def get_exploded_launcher_command(jar, dir)
+  `unzip #{jar} -d #{dir}`
+  launcherClass = "org.springframework.boot.loader.JarLauncher"
+  return "pushd #{dir} && java #{launcherClass} 2>&1 && popd"
+end
+
 def get_main_method_command(jar, dir)
   `unzip #{jar} -d #{dir}`
   jars = Dir.glob(File.join(dir, "**", "*.jar")).join(":")
-  return "java -classpath #{dir}/BOOT-INF/classes:#{jars} #{find_main_class(dir)}"
+  return "java -classpath #{dir}/BOOT-INF/classes:#{jars} org.springframework.ide.vscode.boot.app.BootLanguagServerBootApp 2>&1"
 end
 
 def find_main_class(dir)
